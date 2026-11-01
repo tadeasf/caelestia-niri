@@ -1,0 +1,35 @@
+#!/usr/bin/python3
+"""niri-mods-held: exit 0 if Alt or Super is held on any input device, else 1.
+
+QML can't read the keyboard modifier state, and a quick Alt+Tab tap releases Alt
+before the switcher has keyboard focus, so it would never see the release.
+Needs read access to /dev/input/event* (the `input` group).
+"""
+import fcntl
+import re
+import sys
+from concurrent.futures import ThreadPoolExecutor
+
+MODS = (56, 100, 125, 126)  # KEY_LEFTALT, KEY_RIGHTALT, KEY_LEFTMETA, KEY_RIGHTMETA
+NBYTES = 96  # KEY_MAX 0x2ff bits
+EVIOCGKEY = (2 << 30) | (NBYTES << 16) | (ord("E") << 8) | 0x18
+
+def keyboards():
+    """Devices with key repeat (EV_REP): real keyboards, not power buttons or mice."""
+    for blk in open("/proc/bus/input/devices").read().split("\n\n"):
+        h, ev = re.search(r"H: Handlers=(.*)", blk), re.search(r"B: EV=(\w+)", blk)
+        if h and ev and "kbd" in h.group(1) and int(ev.group(1), 16) & (1 << 20):
+            yield from (f"/dev/input/{e}" for e in re.findall(r"event\d+", h.group(1)))
+
+def held(dev):
+    try:
+        with open(dev, "rb") as f:
+            buf = bytearray(NBYTES)
+            fcntl.ioctl(f, EVIOCGKEY, buf)
+    except OSError:
+        return False
+    return any(buf[k // 8] >> (k % 8) & 1 for k in MODS)
+
+# opening an evdev node takes 10-70 ms here, so ask all keyboards at once
+with ThreadPoolExecutor() as pool:
+    sys.exit(0 if any(pool.map(held, keyboards())) else 1)

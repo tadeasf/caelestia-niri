@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# Switch the niri session between niri-gnome (waybar + GTK daemons) and Caelestia.
+#
+#   niri-shell                 show the current mode
+#   niri-shell gnome|caelestia set the mode (writes ~/.config/niri-shell/mode)
+#   niri-shell toggle          flip it
+#
+# The mode file is the single source of truth: niri-shell.path applies it when it
+# changes and niri-shell.service applies it at login, so editing it by hand works too.
+# Internal: apply, is-gnome (ExecCondition of the niri-gnome units), run-caelestia.
+set -euo pipefail
+
+ROOT=$(dirname "$(dirname "$(readlink -f "$0")")")
+RUN=$ROOT/run
+PFX=$HOME/.local/opt/caelestia-niri
+MODE_FILE=${XDG_CONFIG_HOME:-$HOME/.config}/niri-shell/mode
+KDL=${XDG_RUNTIME_DIR:-/run/user/$UID}/niri-shell.kdl
+GNOME_UNITS=(niri-waybar.service niri-panels.service niri-swayosd.service niri-swaybg.service)
+
+mode() {
+    local m
+    m=$(grep -vE '^[[:space:]]*(#|$)' "$MODE_FILE" 2>/dev/null | head -1 | tr -d '[:space:]') || true
+    [[ $m == caelestia ]] && echo caelestia || echo gnome
+}
+
+write_mode() {
+    mkdir -p "$(dirname "$MODE_FILE")"
+    printf '# niri desktop shell: gnome or caelestia. Saving this file switches the running session.\n%s\n' "$1" >"$MODE_FILE.tmp"
+    mv "$MODE_FILE.tmp" "$MODE_FILE"
+    # the path unit applies it; apply directly if it isn't running (e.g. outside niri)
+    systemctl --user is-active -q niri-shell.path || apply
+}
+
+qs_ipc() { qs -p "$RUN" ipc call "$@"; }
+
+# Same keys, same jobs as niri-gnome's config.kdl; only who performs them changes.
+binds() {
+    local q="\"qs\" \"-p\" \"$RUN\" \"ipc\" \"call\""
+    cat <<EOF
+// Written by niri-shell for Caelestia mode, removed in gnome mode. Do not edit.
+binds {
+    Mod+D hotkey-overlay-title="Launcher: Caelestia" { spawn $q "drawers" "toggle" "launcher"; }
+    Alt+F2 hotkey-overlay-title=null { spawn $q "drawers" "toggle" "launcher"; }
+    Alt+Tab hotkey-overlay-title="Switch applications: Caelestia" { spawn $q "switcher" "next"; }
+    Alt+Shift+Tab { spawn $q "switcher" "prev"; }
+    Mod+Tab hotkey-overlay-title=null { spawn $q "switcher" "next"; }
+    Mod+Shift+Tab { spawn $q "switcher" "prev"; }
+    Alt+grave hotkey-overlay-title="Switch windows of the app: Caelestia" { spawn $q "switcher" "window"; }
+    Alt+Shift+grave { spawn $q "switcher" "prevWindow"; }
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "wpctl" "set-volume" "-l" "1" "@DEFAULT_AUDIO_SINK@" "6%+"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "6%-"; }
+    XF86AudioMute        allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
+    XF86AudioMicMute     allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"; }
+    XF86MonBrightnessUp   allow-when-locked=true { spawn $q "brightness" "set" "+10%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn $q "brightness" "set" "10%-"; }
+}
+EOF
+}
+
+gnome_wallpaper() {
+    gsettings get org.gnome.desktop.background picture-uri-dark | sed -e "s|^'file://||" -e "s|'$||"
+}
+
+apply() {
+    if [[ $(mode) == caelestia ]]; then
+        if [[ ! -f $RUN/shell.qml ]]; then
+            echo "niri-shell: $RUN missing, run $ROOT/build.py first; staying on gnome" >&2
+            write_mode gnome
+            return 1
+        fi
+        binds >"$KDL.tmp" && mv "$KDL.tmp" "$KDL"
+        niri msg action load-config-file || true
+        systemctl --user stop "${GNOME_UNITS[@]}" mako.service
+        systemctl --user start niri-caelestia.service
+        # Caelestia derives its colours from its wallpaper: use the GNOME one
+        local wall cur
+        wall=$(gnome_wallpaper)
+        for _ in $(seq 50); do
+            if cur=$(qs_ipc wallpaper get 2>/dev/null); then
+                [[ -f $wall && $cur != "$wall" ]] && qs_ipc wallpaper set "$wall"
+                break
+            fi
+            sleep 0.2
+        done
+    else
+        rm -f "$KDL"
+        niri msg action load-config-file || true
+        systemctl --user stop niri-caelestia.service
+        systemctl --user start "${GNOME_UNITS[@]}"
+    fi
+}
+
+case ${1:-status} in
+    gnome | caelestia) write_mode "$1" ;;
+    toggle) [[ $(mode) == gnome ]] && write_mode caelestia || write_mode gnome ;;
+    apply) apply ;;
+    binds) binds ;;
+    is-gnome) [[ $(mode) == gnome ]] ;;
+    run-caelestia)
+        export QML_IMPORT_PATH=$PFX/qml:$PFX/lib64/qt6/qml CAELESTIA_LIB_DIR=$PFX/lib/caelestia
+        exec qs -p "$RUN"
+        ;;
+    status) echo "$(mode)" ;;
+    *)
+        sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+        exit 2
+        ;;
+esac

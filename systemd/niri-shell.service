@@ -1,0 +1,10 @@
+[Unit]
+Description=Apply the niri desktop shell mode (~/.config/niri-shell/mode)
+After=niri.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/niri-shell apply
+
+[Install]
+WantedBy=niri.service

@@ -1,0 +1,10 @@
+[Unit]
+Description=Caelestia shell on niri (niri-shell caelestia mode)
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/niri-shell run-caelestia
+Restart=on-failure
+RestartSec=1

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Switch desktop shell
+GenericName=niri-gnome / Caelestia
+Comment=Toggle the niri session between niri-gnome and Caelestia
+Exec=niri-shell toggle
+Icon=preferences-desktop-theme
+Terminal=false
+OnlyShowIn=niri;
+Keywords=caelestia;gnome;shell;bar;theme;

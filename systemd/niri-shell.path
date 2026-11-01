@@ -1,0 +1,8 @@
+[Unit]
+Description=Switch the niri desktop shell when ~/.config/niri-shell/mode changes
+
+[Path]
+PathChanged=%h/.config/niri-shell/mode
+
+[Install]
+WantedBy=niri.service

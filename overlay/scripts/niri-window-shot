@@ -1,0 +1,71 @@
+#!/usr/bin/python3
+"""niri-window-shot ID OUT [WIDTH]: grab one frame of niri window ID into the PNG OUT.
+
+niri has no per-window capture protocol for Quickshell's ScreencopyView, and
+`niri msg action screenshot-window` always overwrites the clipboard. This uses
+niri's org.gnome.Mutter.ScreenCast API (the one the portal uses), same as
+niri-gnome's niri-switcher: works for off-screen windows, never touches the clipboard.
+"""
+import json
+import os
+import subprocess
+import sys
+
+from gi.repository import Gio, GLib
+
+SC = "org.gnome.Mutter.ScreenCast"
+
+
+def main() -> int:
+    win_id, out = int(sys.argv[1]), sys.argv[2]
+    width = int(sys.argv[3]) if len(sys.argv) > 3 else 1280
+    wins = json.loads(subprocess.run(["niri", "msg", "-j", "windows"], capture_output=True, text=True, check=True).stdout)
+    win = next((w for w in wins if w["id"] == win_id), None)
+    if not win:
+        print(f"niri-window-shot: no window {win_id}", file=sys.stderr)
+        return 1
+    ww, wh = win["layout"]["window_size"]
+    height = max(1, round(width * wh / max(1, ww)))
+
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION)
+
+    def call(path, iface, method, args=None, rtype=None):
+        return bus.call_sync(SC, path, iface, method, args, rtype, Gio.DBusCallFlags.NONE, 2000, None)
+
+    sess = call("/org/gnome/Mutter/ScreenCast", SC, "CreateSession",
+                GLib.Variant("(a{sv})", ({},)), GLib.VariantType("(o)"))[0]
+    try:
+        stream = call(sess, SC + ".Session", "RecordWindow",
+                      GLib.Variant("(a{sv})", ({"window-id": GLib.Variant("t", win_id),
+                                                "cursor-mode": GLib.Variant("u", 0)},)),
+                      GLib.VariantType("(o)"))[0]
+        loop = GLib.MainLoop()
+        node = []
+        bus.signal_subscribe(None, SC + ".Stream", "PipeWireStreamAdded", stream, None, Gio.DBusSignalFlags.NONE,
+                             lambda *a: (node.append(a[-1][0]), loop.quit()))
+        GLib.timeout_add(3000, loop.quit)
+        call(sess, SC + ".Session", "Start")
+        loop.run()
+        if not node:
+            print("niri-window-shot: no stream", file=sys.stderr)
+            return 1
+        tmp = f"{out}.{os.getpid()}.tmp"
+        # niri only offers DMA-BUF, so download through GL; RGB because translucent backgrounds go black anyway
+        subprocess.run(["gst-launch-1.0", "-q", "pipewiresrc", f"path={node[0]}", "num-buffers=1", "!",
+                        "glupload", "!", "glcolorconvert", "!", "gldownload", "!", "videoconvert", "!", "videoscale", "!",
+                        f"video/x-raw,format=RGB,width={width},height={height},pixel-aspect-ratio=1/1", "!",
+                        "pngenc", "!", "filesink", f"location={tmp}"],
+                       check=True, timeout=3, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        os.replace(tmp, out)  # atomic, so a reading Image never sees half a file
+        return 0
+    except (subprocess.SubprocessError, GLib.Error) as e:
+        print("niri-window-shot:", e, file=sys.stderr)
+        return 1
+    finally:
+        call(sess, SC + ".Session", "Stop")
+        if "tmp" in locals() and os.path.exists(tmp):
+            os.remove(tmp)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
