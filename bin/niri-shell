@@ -98,6 +98,8 @@ case ${1:-status} in
     is-gnome) [[ $(mode) == gnome ]] ;;
     run-caelestia)
         export QML_IMPORT_PATH=$PFX/qml:$PFX/lib64/qt6/qml CAELESTIA_LIB_DIR=$PFX/lib/caelestia
+        # qs's own crash-restart drops -p and boots ~/.config/quickshell instead; let systemd restart us
+        export QS_DISABLE_CRASH_HANDLER=1
         exec qs -p "$RUN"
         ;;
     status) echo "$(mode)" ;;
