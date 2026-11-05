@@ -49,6 +49,22 @@ EXACT_PATCHES = [
     ("modules/bar/popouts/ActiveWindow.qml",
      "            ScreencopyView {\n                id: preview\n\n                captureSource: Hypr.activeToplevel?.wayland ?? null\n",
      "            NiriWindowShot {\n                id: preview\n\n                captureSource: Hypr.activeToplevel ?? null\n"),
+    # Claude usage bar entry + popout (overlay-only files, enabled via bar.entries id "claudeUsage")
+    ("modules/bar/Bar.qml",
+     "            DelegateChoice {\n                roleValue: \"statusIcons\"\n",
+     "            DelegateChoice {\n                roleValue: \"claudeUsage\"\n                delegate: EntryWrapper {\n                    ClaudeUsage {}\n                }\n            }\n"
+     + "            DelegateChoice {\n                roleValue: \"statusIcons\"\n"),
+    ("modules/bar/Bar.qml",
+     "        } else if (id === \"activeWindow\" && ",
+     "        } else if (id === \"claudeUsage\") {\n"
+     + "            popouts.currentName = \"claudeusage\";\n"
+     + "            popouts.currentCenter = (ch.item as Item).mapToItem(root, 0, (ch.item as Item).implicitHeight / 2).y ?? 0;\n"
+     + "            popouts.hasCurrent = true;\n"
+     + "        } else if (id === \"activeWindow\" && "),
+    ("modules/bar/popouts/Content.qml",
+     "        Popout {\n            name: \"lockstatus\"\n",
+     "        Popout {\n            name: \"claudeusage\"\n            sourceComponent: ClaudeUsage {}\n        }\n\n"
+     + "        Popout {\n            name: \"lockstatus\"\n"),
     # Alt/Super+Tab switcher (modules/switcher, overlay-only)
     ("shell.qml", "import qs.modules.lock\n", "import qs.modules.lock\nimport qs.modules.switcher\n"),
     ("shell.qml", "    AreaPicker {}\n", "    AreaPicker {}\n    Switcher {}\n"),
