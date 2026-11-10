@@ -27,6 +27,7 @@ Tags before v1.4.2 predate `upstream.rev`: run `git -C upstream checkout b9a15ba
 | 1.4.0 | Overview workspace grips: drag to reorder, close to merge into the neighbour |
 | 1.4.1 | Bar shows the workspaces niri has instead of a fixed five |
 | 1.4.2 | Pinned upstream, CI and releases (no shell changes) |
+| 1.5.0 | Notification click focuses the sending app's window (or launches it); screenshot notifications open in the image viewer |
 
 PR labels pick the bump: `release:minor` (feature), `release:major` (breaking), `release:skip` (no release), none = patch.
 
