@@ -79,6 +79,10 @@ EXACT_PATCHES = [
     # Overview workspace grips: reorder/delete (modules/wshandles + scripts/niri-ws, overlay-only)
     ("shell.qml", "import qs.modules.switcher\n", "import qs.modules.switcher\nimport qs.modules.wshandles\n"),
     ("shell.qml", "    Switcher {}\n", "    Switcher {}\n    WsHandles {}\n"),
+    # niri workspaces are dynamic: the bar shows the ones that exist instead of a fixed bar.workspaces.shown
+    ("modules/bar/components/workspaces/Workspaces.qml",
+     "    readonly property int shown: Math.max(1, Config.bar.workspaces.shown)\n",
+     "    readonly property int shown: Math.max(1, Hypr.workspaces.values.filter(w => w.monitor === monitor).length)\n"),
     # Keep awake toggle: niri only honours idle inhibitors on visible surfaces, Caelestia's is a 0x0 window, so gate the idle timers directly
     ("daemons/IdleMonitors.qml", "import Caelestia.Services\n", "import Caelestia.Services\nimport Caelestia.State\n"),
     ("daemons/IdleMonitors.qml",
