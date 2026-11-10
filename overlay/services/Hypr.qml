@@ -301,6 +301,10 @@ Singleton {
             for (const w of Object.values(_win))
                 w.is_focused = w.id === e.id;
             break;
+        case "WindowFocusTimestampChanged":
+            if (_win[String(e.id)])
+                _win[String(e.id)].focus_timestamp = e.focus_timestamp;
+            return; // only read by NotifData.activate, no rebuild needed
         case "WindowUrgencyChanged":
             if (_win[String(e.id)])
                 _win[String(e.id)].is_urgent = e.urgent;

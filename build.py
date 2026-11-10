@@ -88,6 +88,51 @@ EXACT_PATCHES = [
     ("daemons/IdleMonitors.qml",
      "    readonly property bool enabled: {\n",
      "    readonly property bool enabled: {\n        if (RuntimeState.inhibitIdle)\n            return false;\n"),
+    # Notification click: run the default action, then raise the sender's newest window or launch it; a screenshot opens in the image viewer.
+    # Quickshell sends no xdg-activation token with ActionInvoked, so on niri apps cannot raise themselves.
+    ("services/NotifData.qml",
+     "    function lock(item: Item): void {\n",
+     """    function activate(): void {
+        const def = actions.find(a => a.identifier === "default") ?? (actions.length === 1 ? actions[0] : null);
+        popup = false;
+        // niri sends the screenshot as app_icon; libnotify senders put it in image-path (image itself gets swapped for a cache copy)
+        const file = [appIcon, hints?.["image-path"], notification?.image].find(s => /^file:\\/\\/\\/./.test(s ?? ""));
+        if (!def && file) {
+            Qt.openUrlExternally(file);
+            return;
+        }
+        const lookup = s => s ? DesktopEntries.heuristicLookup(s) : null;
+        const entry = lookup(hints?.["desktop-entry"]) ?? lookup(appIcon) ?? lookup(appName);
+        const ts = w => (w.focus_timestamp?.secs ?? 0) * 1e3 + (w.focus_timestamp?.nanos ?? 0) / 1e6;
+        const win = entry ? Object.values(Hypr._win).filter(w => w.app_id === entry.id || lookup(w.app_id)?.id === entry.id)
+            .sort((a, b) => b.is_urgent - a.is_urgent || ts(b) - ts(a))[0] : null;
+        def?.invoke?.(); // restored notifications have no invoke
+        if (win)
+            Hypr.action("focus-window", "--id", win.id);
+        else
+            entry?.execute();
+    }
+
+    function lock(item: Item): void {
+"""),
+    ("modules/notifications/Notification.qml",
+     "            if (!GlobalConfig.notifs.actionOnClick || event.button !== Qt.LeftButton)\n"
+     "                return;\n\n"
+     "            const actions = root.modelData.actions;\n"
+     "            if (actions.length === 1)\n"
+     "                actions[0].invoke();\n",
+     "            if (event.button === Qt.LeftButton)\n"
+     "                root.modelData.activate();\n"),
+    ("modules/notifications/Notification.qml",
+     "                        onClicked: modelData.invoke()\n",
+     "                        onClicked: modelData.identifier === \"default\" ? root.modelData.activate() : modelData.invoke()\n"),
+    ("modules/sidebar/NotifActionList.qml",
+     "                                action.modelData.invoke();\n",
+     "                                action.modelData.identifier === \"default\" ? root.notif.activate() : action.modelData.invoke();\n"),
+    ("modules/sidebar/NotifGroupList.qml",
+     "            onReleased: event => {\n                if (Math.abs(x) < width * Config.notifs.clearThreshold)\n",
+     "            onClicked: event => {\n                if (event.button === Qt.LeftButton)\n                    modelData?.activate();\n            }\n"
+     "            onReleased: event => {\n                if (Math.abs(x) < width * Config.notifs.clearThreshold)\n"),
 ]
 
 
