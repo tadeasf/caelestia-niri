@@ -73,6 +73,11 @@ EXACT_PATCHES = [
 
 def git(*args: str) -> str:
     return subprocess.run(["git", "-C", str(UP), *args], check=True, capture_output=True, text=True).stdout.strip()
+    # Keep awake toggle: niri only honours idle inhibitors on visible surfaces, Caelestia's is a 0x0 window, so gate the idle timers directly
+    ("daemons/IdleMonitors.qml", "import Caelestia.Services\n", "import Caelestia.Services\nimport Caelestia.State\n"),
+    ("daemons/IdleMonitors.qml",
+     "    readonly property bool enabled: {\n",
+     "    readonly property bool enabled: {\n        if (RuntimeState.inhibitIdle)\n            return false;\n"),
 
 
 def blob(rel: str) -> str | None:
