@@ -18,7 +18,8 @@ jobs:
         run: shellcheck install.sh bin/niri-shell
 
       - name: Python syntax
-        run: python3 -m py_compile build.py tests_niri_ws.py overlay/scripts/niri-ws overlay/scripts/niri-window-shot overlay/scripts/niri-mods-held
+        # ast.parse, not py_compile: no __pycache__ for build.py to copy into run/
+        run: python3 -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' build.py tests_niri_ws.py overlay/scripts/niri-ws overlay/scripts/niri-window-shot overlay/scripts/niri-mods-held
 
       # Clones upstream at upstream.rev and applies the overlay + patches; fails if a patch no longer matches.
       - name: Build against pinned upstream
