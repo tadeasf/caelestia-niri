@@ -3,3 +3,4 @@ run.tmp/
 run.old/
 .deps/
 upstream/
+__pycache__/
