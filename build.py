@@ -65,19 +65,24 @@ EXACT_PATCHES = [
      "        Popout {\n            name: \"lockstatus\"\n",
      "        Popout {\n            name: \"claudeusage\"\n            sourceComponent: ClaudeUsage {}\n        }\n\n"
      + "        Popout {\n            name: \"lockstatus\"\n"),
+    # Network + system usage bar entry (overlay-only file, enabled via bar.entries id "sysUsage")
+    ("modules/bar/Bar.qml",
+     "            DelegateChoice {\n                roleValue: \"claudeUsage\"\n",
+     "            DelegateChoice {\n                roleValue: \"sysUsage\"\n                delegate: EntryWrapper {\n                    SysUsage {}\n                }\n            }\n"
+     + "            DelegateChoice {\n                roleValue: \"claudeUsage\"\n"),
     # Alt/Super+Tab switcher (modules/switcher, overlay-only)
     ("shell.qml", "import qs.modules.lock\n", "import qs.modules.lock\nimport qs.modules.switcher\n"),
     ("shell.qml", "    AreaPicker {}\n", "    AreaPicker {}\n    Switcher {}\n"),
-]
-
-
-def git(*args: str) -> str:
-    return subprocess.run(["git", "-C", str(UP), *args], check=True, capture_output=True, text=True).stdout.strip()
     # Keep awake toggle: niri only honours idle inhibitors on visible surfaces, Caelestia's is a 0x0 window, so gate the idle timers directly
     ("daemons/IdleMonitors.qml", "import Caelestia.Services\n", "import Caelestia.Services\nimport Caelestia.State\n"),
     ("daemons/IdleMonitors.qml",
      "    readonly property bool enabled: {\n",
      "    readonly property bool enabled: {\n        if (RuntimeState.inhibitIdle)\n            return false;\n"),
+]
+
+
+def git(*args: str) -> str:
+    return subprocess.run(["git", "-C", str(UP), *args], check=True, capture_output=True, text=True).stdout.strip()
 
 
 def blob(rel: str) -> str | None:
