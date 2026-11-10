@@ -49,22 +49,25 @@ EXACT_PATCHES = [
     ("modules/bar/popouts/ActiveWindow.qml",
      "            ScreencopyView {\n                id: preview\n\n                captureSource: Hypr.activeToplevel?.wayland ?? null\n",
      "            NiriWindowShot {\n                id: preview\n\n                captureSource: Hypr.activeToplevel ?? null\n"),
-    # Claude usage bar entry + popout (overlay-only files, enabled via bar.entries id "claudeUsage")
+    # Claude usage bar entry + popout (overlay-only files, enabled via bar.entries id "claudeUsage"); same hover branch opens the sysUsage (dashboard Performance) and clock (calendar) popouts
     ("modules/bar/Bar.qml",
      "            DelegateChoice {\n                roleValue: \"statusIcons\"\n",
      "            DelegateChoice {\n                roleValue: \"claudeUsage\"\n                delegate: EntryWrapper {\n                    ClaudeUsage {}\n                }\n            }\n"
      + "            DelegateChoice {\n                roleValue: \"statusIcons\"\n"),
     ("modules/bar/Bar.qml",
      "        } else if (id === \"activeWindow\" && ",
-     "        } else if (id === \"claudeUsage\") {\n"
-     + "            popouts.currentName = \"claudeusage\";\n"
+     "        } else if (id === \"claudeUsage\" || id === \"sysUsage\" || id === \"clock\") {\n"
+     + "            popouts.currentName = id.toLowerCase();\n"
      + "            popouts.currentCenter = (ch.item as Item).mapToItem(root, 0, (ch.item as Item).implicitHeight / 2).y ?? 0;\n"
      + "            popouts.hasCurrent = true;\n"
      + "        } else if (id === \"activeWindow\" && "),
     ("modules/bar/popouts/Content.qml",
      "        Popout {\n            name: \"lockstatus\"\n",
      "        Popout {\n            name: \"claudeusage\"\n            sourceComponent: ClaudeUsage {}\n        }\n\n"
+     + "        Popout {\n            name: \"sysusage\"\n            sourceComponent: Dashboard.Performance {}\n        }\n\n"
+     + "        Popout {\n            name: \"clock\"\n            sourceComponent: Calendar {}\n        }\n\n"
      + "        Popout {\n            name: \"lockstatus\"\n"),
+    ("modules/bar/popouts/Content.qml", "import qs.components\n", "import qs.components\nimport qs.modules.dashboard as Dashboard\n"),
     # Network + system usage bar entry (overlay-only file, enabled via bar.entries id "sysUsage")
     ("modules/bar/Bar.qml",
      "            DelegateChoice {\n                roleValue: \"claudeUsage\"\n",
