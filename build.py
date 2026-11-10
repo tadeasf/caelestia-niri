@@ -49,9 +49,35 @@ EXACT_PATCHES = [
     ("modules/bar/popouts/ActiveWindow.qml",
      "            ScreencopyView {\n                id: preview\n\n                captureSource: Hypr.activeToplevel?.wayland ?? null\n",
      "            NiriWindowShot {\n                id: preview\n\n                captureSource: Hypr.activeToplevel ?? null\n"),
+    # Claude usage bar entry + popout (overlay-only files, enabled via bar.entries id "claudeUsage")
+    ("modules/bar/Bar.qml",
+     "            DelegateChoice {\n                roleValue: \"statusIcons\"\n",
+     "            DelegateChoice {\n                roleValue: \"claudeUsage\"\n                delegate: EntryWrapper {\n                    ClaudeUsage {}\n                }\n            }\n"
+     + "            DelegateChoice {\n                roleValue: \"statusIcons\"\n"),
+    ("modules/bar/Bar.qml",
+     "        } else if (id === \"activeWindow\" && ",
+     "        } else if (id === \"claudeUsage\") {\n"
+     + "            popouts.currentName = \"claudeusage\";\n"
+     + "            popouts.currentCenter = (ch.item as Item).mapToItem(root, 0, (ch.item as Item).implicitHeight / 2).y ?? 0;\n"
+     + "            popouts.hasCurrent = true;\n"
+     + "        } else if (id === \"activeWindow\" && "),
+    ("modules/bar/popouts/Content.qml",
+     "        Popout {\n            name: \"lockstatus\"\n",
+     "        Popout {\n            name: \"claudeusage\"\n            sourceComponent: ClaudeUsage {}\n        }\n\n"
+     + "        Popout {\n            name: \"lockstatus\"\n"),
+    # Network + system usage bar entry (overlay-only file, enabled via bar.entries id "sysUsage")
+    ("modules/bar/Bar.qml",
+     "            DelegateChoice {\n                roleValue: \"claudeUsage\"\n",
+     "            DelegateChoice {\n                roleValue: \"sysUsage\"\n                delegate: EntryWrapper {\n                    SysUsage {}\n                }\n            }\n"
+     + "            DelegateChoice {\n                roleValue: \"claudeUsage\"\n"),
     # Alt/Super+Tab switcher (modules/switcher, overlay-only)
     ("shell.qml", "import qs.modules.lock\n", "import qs.modules.lock\nimport qs.modules.switcher\n"),
     ("shell.qml", "    AreaPicker {}\n", "    AreaPicker {}\n    Switcher {}\n"),
+    # Keep awake toggle: niri only honours idle inhibitors on visible surfaces, Caelestia's is a 0x0 window, so gate the idle timers directly
+    ("daemons/IdleMonitors.qml", "import Caelestia.Services\n", "import Caelestia.Services\nimport Caelestia.State\n"),
+    ("daemons/IdleMonitors.qml",
+     "    readonly property bool enabled: {\n",
+     "    readonly property bool enabled: {\n        if (RuntimeState.inhibitIdle)\n            return false;\n"),
 ]
 
 

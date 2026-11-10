@@ -35,7 +35,7 @@ volume, mic mute and brightness keys. Lock screen, media keys, udiskie and the o
 | Path | What |
 |---|---|
 | `upstream/` | plain clone of caelestia-dots/shell (gitignored) |
-| `overlay/` | niri replacements: `services/Hypr.qml` (niri event-stream backend), `components/NiriFocusGrab.qml`, `components/NiriWindowShot.qml`, `modules/switcher/`, `scripts/`, inert `CustomShortcut.qml` |
+| `overlay/` | niri replacements: `services/Hypr.qml` (niri event-stream backend), `components/NiriFocusGrab.qml`, `components/NiriWindowShot.qml`, `modules/switcher/`, `scripts/`, inert `CustomShortcut.qml`, Claude usage (`services/ClaudeLimits.qml` + bar entry/popout `ClaudeUsage.qml`, bar id `claudeUsage`), network + system usage (bar entry `SysUsage.qml`, bar id `sysUsage`) |
 | `build.py` | builds `run/` = upstream + overlay + patches; patches must match or the build fails |
 | `overlay.lock` | upstream version each overlay file was ported from; `build.py` warns when it moves |
 | `bin/niri-shell`, `systemd/`, `applications/` | the switcher, installed by `install.sh` |
