@@ -1,0 +1,90 @@
+#!/usr/bin/python3
+"""niri-ws: reorder or delete a niri workspace, keeping Super+1..4 positional.
+
+  niri-ws move <workspace id> <index>   move the workspace to a 1-based position
+  niri-ws delete <workspace id>         move its windows to the neighbour, drop it
+  niri-ws renumber                      only fix the names up
+
+Named workspaces survive being empty and niri always keeps one empty workspace last,
+so three named ones make the minimum of four. After every change the first three are
+renamed 1-3 top to bottom and the rest lose their names (niri then removes them once
+empty); Super+4 goes by index. Talks to $NIRI_SOCKET directly because `niri msg` can
+only reference workspaces by index or name, and both shift mid-operation.
+"""
+import json
+import os
+import socket
+import sys
+
+KEEP = 3  # named workspaces; niri's trailing empty one is the fourth
+
+
+def req(body):
+    with socket.socket(socket.AF_UNIX) as s:
+        s.connect(os.environ["NIRI_SOCKET"])
+        s.sendall(json.dumps(body).encode() + b"\n")
+        reply = json.loads(s.makefile().readline())
+    if "Err" in reply:
+        sys.exit(f"niri-ws: {body}: {reply['Err']}")
+    return reply["Ok"]
+
+
+def act(action, /, **args):
+    req({"Action": {action: args}})
+
+
+def workspaces(output):
+    ws = req("Workspaces")["Workspaces"]
+    return sorted((w for w in ws if w["output"] == output), key=lambda w: w["idx"])
+
+
+def renumber(output):
+    # shortcut: names are global in niri, so this assumes one output; with two, number only the primary.
+    ws = workspaces(output)
+    want = {w["id"]: str(i) if i <= KEEP else None for i, w in enumerate(ws, 1)}
+    wrong = [w for w in ws if w["name"] != want[w["id"]]]
+    # park the wrong ones on temporary names first: niri refuses a name that is still taken,
+    # and unnaming an empty workspace would delete it mid-shuffle
+    for w in wrong:
+        if want[w["id"]]:
+            act("SetWorkspaceName", name=f"niri-ws-{w['id']}", workspace={"Id": w["id"]})
+    for w in wrong:
+        if not want[w["id"]]:
+            act("UnsetWorkspaceName", reference={"Id": w["id"]})
+    for w in wrong:
+        if want[w["id"]]:
+            act("SetWorkspaceName", name=want[w["id"]], workspace={"Id": w["id"]})
+
+
+def main():
+    cmd = sys.argv[1]
+    all_ws = req("Workspaces")["Workspaces"]
+    if cmd == "renumber":
+        return renumber(next(w["output"] for w in all_ws if w["is_focused"]))
+    wid = int(sys.argv[2])
+    target = next((w for w in all_ws if w["id"] == wid), None)
+    if not target:
+        sys.exit(f"niri-ws: no workspace with id {wid}")
+    ws = workspaces(target["output"])
+    ref = {"Id": wid}
+
+    if cmd == "move":
+        act("MoveWorkspaceToIndex", index=max(1, min(int(sys.argv[3]), len(ws))), reference=ref)
+    elif cmd == "delete":
+        pos = ws.index(target)
+        if len(ws) > 1:
+            dest = ws[pos - 1 if pos else 1]
+            for win in req("Windows")["Windows"]:
+                if win["workspace_id"] == wid:
+                    act("MoveWindowToWorkspace", window_id=win["id"], reference={"Id": dest["id"]}, focus=False)
+            if target["is_active"]:
+                act("FocusWorkspace", reference={"Id": dest["id"]})
+            # now empty: send it to the end, where renumber() unnames it and niri drops it
+            act("MoveWorkspaceToIndex", index=len(ws), reference=ref)
+    else:
+        sys.exit(__doc__)
+    renumber(target["output"])
+
+
+if __name__ == "__main__":
+    main()
