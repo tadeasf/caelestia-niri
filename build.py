@@ -96,7 +96,8 @@ EXACT_PATCHES = [
         const def = actions.find(a => a.identifier === "default") ?? (actions.length === 1 ? actions[0] : null);
         popup = false;
         // niri sends the screenshot as app_icon; libnotify senders put it in image-path (image itself gets swapped for a cache copy)
-        const file = [appIcon, hints?.["image-path"], notification?.image].find(s => /^file:\\/\\/\\/./.test(s ?? ""));
+        // images only: any app can send a file:// path, and opening e.g. a script would hand it to whatever runs scripts
+        const file = [appIcon, hints?.["image-path"], notification?.image].find(s => /^file:\\/\\/\\/.+\\.(png|jpe?g|webp|gif|bmp|avif|jxl|tiff?)$/i.test(s ?? ""));
         if (!def && file) {
             Qt.openUrlExternally(file);
             return;
