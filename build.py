@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Merge upstream Caelestia + niri overlay + patches into run/.
 
-  ./build.py           rebuild run/ from upstream/ (clones it if missing)
-  ./build.py --pull    git pull upstream first
+  ./build.py           rebuild run/ from upstream/ at the commit pinned in upstream.rev (clones it if missing)
+  ./build.py --pull    move upstream/ to the newest upstream commit and pin that
   ./build.py --accept  accept upstream changes to overridden files (after porting them)
 
 Overlay files replace upstream files wholesale; overlay.lock remembers which
@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-UP, OVL, RUN, LOCK = ROOT / "upstream", ROOT / "overlay", ROOT / "run", ROOT / "overlay.lock"
+UP, OVL, RUN, LOCK, REV = ROOT / "upstream", ROOT / "overlay", ROOT / "run", ROOT / "overlay.lock", ROOT / "upstream.rev"
 REPO = "https://github.com/caelestia-dots/shell.git"
 
 # (glob, regex, replacement, minimum matches across all files)
@@ -102,11 +102,29 @@ def blob(rel: str) -> str | None:
         return None
 
 
-def main() -> int:
+def sync_upstream() -> None:
+    """Check upstream/ out at upstream.rev, so every tag of this repo builds against the upstream it was made for."""
     if not UP.exists():
         subprocess.run(["git", "clone", REPO, str(UP)], check=True)
+    before = git("rev-parse", "HEAD")
     if "--pull" in sys.argv:
-        print(git("pull", "--ff-only"))
+        git("fetch", "--quiet", "origin")
+        git("checkout", "--quiet", "--detach", "origin/HEAD")
+        REV.write_text(git("rev-parse", "HEAD") + "\n")
+    elif REV.exists():
+        pin = REV.read_text().strip()
+        if subprocess.run(["git", "-C", str(UP), "cat-file", "-e", f"{pin}^{{commit}}"], capture_output=True).returncode:
+            git("fetch", "--quiet", "origin")
+        git("checkout", "--quiet", "--detach", pin)
+    after = git("rev-parse", "HEAD")
+    if before != after:
+        print(f"upstream: {before[:8]} -> {after[:8]}")
+        if git("diff", "--name-only", before, after, "--", "plugin"):
+            print("upstream changed plugin/: rebuild the C++ plugin (README, 'Update upstream')")
+
+
+def main() -> int:
+    sync_upstream()
 
     lock = json.loads(LOCK.read_text()) if LOCK.exists() else {}
     accept = "--accept" in sys.argv

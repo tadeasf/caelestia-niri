@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Shell scripts
+        run: shellcheck install.sh bin/niri-shell
+
+      - name: Python syntax
+        # ast.parse, not py_compile: no __pycache__ for build.py to copy into run/
+        run: python3 -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' build.py tests_niri_ws.py overlay/scripts/niri-ws overlay/scripts/niri-window-shot overlay/scripts/niri-mods-held
+
+      # Clones upstream at upstream.rev and applies the overlay + patches; fails if a patch no longer matches.
+      - name: Build against pinned upstream
+        run: ./build.py

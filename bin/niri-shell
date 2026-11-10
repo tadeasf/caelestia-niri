@@ -92,7 +92,7 @@ apply() {
 
 case ${1:-status} in
     gnome | caelestia) write_mode "$1" ;;
-    toggle) [[ $(mode) == gnome ]] && write_mode caelestia || write_mode gnome ;;
+    toggle) if [[ $(mode) == gnome ]]; then write_mode caelestia; else write_mode gnome; fi ;;
     apply) apply ;;
     binds) binds ;;
     is-gnome) [[ $(mode) == gnome ]] ;;
@@ -102,7 +102,7 @@ case ${1:-status} in
         export QS_DISABLE_CRASH_HANDLER=1
         exec qs -p "$RUN"
         ;;
-    status) echo "$(mode)" ;;
+    status) mode ;;
     *)
         sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
         exit 2
