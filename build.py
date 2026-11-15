@@ -132,8 +132,19 @@ EXACT_PATCHES = [
      "                                action.modelData.identifier === \"default\" ? root.notif.activate() : action.modelData.invoke();\n"),
     ("modules/sidebar/NotifGroupList.qml",
      "            onReleased: event => {\n                if (Math.abs(x) < width * Config.notifs.clearThreshold)\n",
-     "            onClicked: event => {\n                if (event.button === Qt.LeftButton)\n                    modelData?.activate();\n            }\n"
+     "            onClicked: event => {\n                if (event.button !== Qt.LeftButton)\n                    return;\n"
+     "                modelData?.activate();\n                root.screenState.dashboard = false; // Notifications dashboard tab\n            }\n"
      "            onReleased: event => {\n                if (Math.abs(x) < width * Config.notifs.clearThreshold)\n"),
+    # Notifications dashboard tab (overlay modules/dashboard/Notifications.qml reuses the sidebar notification dock)
+    ("modules/dashboard/Content.qml",
+     "                text: Tr.tr(\"Weather\"),\n                enabled: Config.dashboard.showWeather\n            }\n",
+     "                text: Tr.tr(\"Weather\"),\n                enabled: Config.dashboard.showWeather\n            },\n"
+     "            {\n                component: notificationsComponent,\n                iconName: \"notifications\",\n"
+     "                text: Tr.tr(\"Notifications\"),\n                enabled: true\n            }\n"),
+    ("modules/dashboard/Content.qml",
+     "                WeatherTab {}\n            }\n",
+     "                WeatherTab {}\n            }\n\n            Component {\n                id: notificationsComponent\n\n"
+     "                Notifications {\n                    screenState: root.screenState\n                }\n            }\n"),
     # OSD app mixer: a chevron under the volume slider opens one slider per app playing audio to its left; the app icon toggles its mute
     ("modules/osd/Content.qml", "import QtQuick.Layouts\n",
      "import QtQuick.Layouts\nimport QtQuick.Controls as QQC\nimport Quickshell\nimport Quickshell.Widgets\nimport Quickshell.Services.Pipewire\n"),
