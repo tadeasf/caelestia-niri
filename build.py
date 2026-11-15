@@ -134,6 +134,158 @@ EXACT_PATCHES = [
      "            onReleased: event => {\n                if (Math.abs(x) < width * Config.notifs.clearThreshold)\n",
      "            onClicked: event => {\n                if (event.button === Qt.LeftButton)\n                    modelData?.activate();\n            }\n"
      "            onReleased: event => {\n                if (Math.abs(x) < width * Config.notifs.clearThreshold)\n"),
+    # OSD app mixer: a chevron under the volume slider opens one slider per app playing audio to its left; the app icon toggles its mute
+    ("modules/osd/Content.qml", "import QtQuick.Layouts\n",
+     "import QtQuick.Layouts\nimport QtQuick.Controls as QQC\nimport Quickshell\nimport Quickshell.Widgets\nimport Quickshell.Services.Pipewire\n"),
+    ("modules/osd/Content.qml",
+     "    ColumnLayout {\n        id: layout\n\n        anchors.centerIn: parent\n"
+     "        anchors.horizontalCenterOffset: CUtils.clamp(Tokens.padding.large - Config.border.thickness, 0, Tokens.padding.large) / 2\n"
+     "        spacing: Tokens.spacing.medium\n",
+     """    property bool appsShown
+    // playback streams only (Quickshell reports isSink for these too, so go by media class)
+    readonly property list<PwNode> appStreams: Audio.streams.filter(s => s.properties["media.class"] === "Stream/Output/Audio")
+    // the drawer background covers the mixer with its own blob, only as tall as the volume part (drawers/ContentWindow.qml)
+    readonly property real mixerWidth: apps.visible ? apps.width + layout.spacing : 0
+    readonly property real mixerHeight: apps.height + Tokens.padding.large * 2
+
+    RowLayout {
+        id: layout
+
+        anchors.centerIn: parent
+        anchors.horizontalCenterOffset: CUtils.clamp(Tokens.padding.large - Config.border.thickness, 0, Tokens.padding.large) / 2
+        spacing: Tokens.spacing.medium
+
+        RowLayout {
+            id: apps
+
+            visible: root.appsShown && root.appStreams.length > 0
+            Layout.alignment: Qt.AlignTop
+            spacing: Tokens.spacing.medium
+
+            Repeater {
+                // one slider per app name: browsers and games often open several streams
+                model: ScriptModel {
+                    values: [...new Set(root.appStreams.map(s => Audio.getStreamName(s)))]
+                }
+
+                ColumnLayout {
+                    id: app
+
+                    required property string modelData
+                    readonly property list<PwNode> streams: root.appStreams.filter(s => Audio.getStreamName(s) === modelData)
+                    readonly property bool muted: streams.every(s => s.audio?.muted)
+                    readonly property real volume: streams[0]?.audio?.volume ?? 0
+                    // desktop entry name ("Zen Browser"), not the stream's application.name ("Zen")
+                    readonly property string label: DesktopEntries.heuristicLookup(modelData)?.name || modelData
+
+                    function setVolume(v: real): void {
+                        for (const s of streams)
+                            Audio.setStreamVolume(s, v);
+                    }
+
+                    spacing: Tokens.spacing.small
+
+                    HoverHandler {
+                        id: appHover
+                    }
+
+                    QQC.ToolTip {
+                        visible: appHover.hovered
+                        delay: 300
+                        x: -implicitWidth - app.Tokens.spacing.small
+                        y: (parent.height - implicitHeight) / 2
+                        padding: app.Tokens.padding.small
+
+                        contentItem: StyledText {
+                            text: app.label
+                            color: Colours.palette.m3inverseOnSurface
+                            font: Tokens.font.body.small
+                        }
+
+                        background: StyledRect {
+                            color: Colours.palette.m3inverseSurface
+                            radius: Tokens.rounding.small
+                        }
+                    }
+
+                    CustomMouseArea {
+                        function onWheel(event: WheelEvent) {
+                            const step = GlobalConfig.services.audioIncrement;
+                            app.setVolume(app.volume + (event.angleDelta.y > 0 ? step : -step));
+                        }
+
+                        implicitWidth: Tokens.sizes.osd.sliderWidth
+                        implicitHeight: Tokens.sizes.osd.sliderHeight
+
+                        FilledSlider {
+                            anchors.fill: parent
+
+                            icon: Icons.getVolumeIcon(value, app.muted)
+                            value: app.volume
+                            to: GlobalConfig.services.maxVolume
+                            onMoved: app.setVolume(value)
+                        }
+                    }
+
+                    MouseArea {
+                        implicitWidth: Tokens.sizes.osd.sliderWidth
+                        implicitHeight: implicitWidth
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            const mute = !app.muted;
+                            for (const s of app.streams)
+                                Audio.setStreamMuted(s, mute);
+                        }
+
+                        IconImage {
+                            anchors.centerIn: parent
+                            implicitSize: parent.width * 0.8
+                            asynchronous: true
+                            source: Icons.getAppIcon(app.modelData, "audio-x-generic")
+                            opacity: app.muted ? 0.4 : 1
+                        }
+                    }
+                }
+            }
+        }
+
+        ColumnLayout {
+        spacing: Tokens.spacing.medium
+"""),
+    ("modules/osd/Content.qml",
+     "                onMoved: Audio.setVolume(value)\n            }\n        }\n",
+     "                onMoved: Audio.setVolume(value)\n            }\n        }\n\n"
+     "        IconButton {\n"
+     "            Layout.alignment: Qt.AlignHCenter\n"
+     "            visible: root.appStreams.length > 0\n"
+     "            isRound: true\n"
+     "            type: IconButton.Text\n"
+     "            icon: root.appsShown ? \"chevron_right\" : \"chevron_left\"\n"
+     "            font: Tokens.font.icon.builders.small.weight(Font.Bold).build()\n"
+     "            onClicked: root.appsShown = !root.appsShown\n"
+     "        }\n"),
+    ("modules/osd/Content.qml",
+     "    }\n\n    component WrappedLoader: Loader {\n",
+     "        }\n    }\n\n    component WrappedLoader: Loader {\n"),
+    ("modules/osd/Wrapper.qml", "    property real brightness\n",
+     "    property real brightness\n"
+     "    readonly property real mixerWidth: content.item?.mixerWidth ?? 0\n"
+     "    readonly property real mixerHeight: content.item?.mixerHeight ?? 0\n"),
+    ("modules/drawers/ContentWindow.qml",
+     "            x: panels.osdWrapper.x + panels.osd.x + bar.implicitWidth\n            implicitWidth: panels.osd.width\n        }\n",
+     """            x: panels.osdWrapper.x + panels.osd.x + panels.osd.mixerWidth + bar.implicitWidth
+            implicitWidth: panels.osd.width - panels.osd.mixerWidth
+        }
+
+        // OSD app mixer: its own blob so the background only reaches as low as the volume part; zero width (closed) drops it from the group
+        PanelBg {
+            panel: panels.osdWrapper
+            deformAmount: 0.25
+            x: osdBg.x - panels.osd.mixerWidth
+            implicitWidth: panels.osd.mixerWidth > 0 ? panels.osd.mixerWidth + radius : 0
+            implicitHeight: panels.osd.mixerHeight
+        }
+"""),
 ]
 
 
