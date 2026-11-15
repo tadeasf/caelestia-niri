@@ -28,6 +28,7 @@ Tags before v1.4.2 predate `upstream.rev`: run `git -C upstream checkout b9a15ba
 | 1.4.1 | Bar shows the workspaces niri has instead of a fixed five |
 | 1.4.2 | Pinned upstream, CI and releases (no shell changes) |
 | 1.5.0 | Notification click focuses the sending app's window (or launches it); screenshot notifications open in the image viewer |
+| 1.6.0 | OSD app mixer: chevron under the volume slider opens a slider per app playing audio (hover shows the app name); click the app icon to mute it |
 
 PR labels pick the bump: `release:minor` (feature), `release:major` (breaking), `release:skip` (no release), none = patch.
 
